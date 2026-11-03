@@ -1,4 +1,4 @@
-import { neon } from "@neondatabase/serverless";
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 
 export type Post = {
@@ -21,11 +21,19 @@ export type Comment = {
   createdAt: string;
 };
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is not set. Copy .env.example to .env.local and fill it in.");
-}
+// Connect lazily so a missing DATABASE_URL fails the request with a clear message
+// instead of breaking the build or every module that imports this file.
+let client: NeonQueryFunction<false, false> | undefined;
 
-const sql = neon(process.env.DATABASE_URL);
+function sql(strings: TemplateStringsArray, ...params: unknown[]) {
+  if (!client) {
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL is not set. Add it to .env.local (local) or the Vercel project settings.");
+    }
+    client = neon(process.env.DATABASE_URL);
+  }
+  return client(strings, ...params);
+}
 
 export function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");

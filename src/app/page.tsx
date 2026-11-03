@@ -1,69 +1,135 @@
-import Image from "next/image";
+import Link from "next/link";
+import { SearchIcon } from "lucide-react";
+import { listPosts } from "@/lib/db";
+import { formatListDate } from "@/lib/format";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
-export default function Home() {
+const PAGE_SIZE = 10;
+
+export default async function Home({ searchParams }: PageProps<"/">) {
+  const params = await searchParams;
+  const query = typeof params.q === "string" ? params.q : "";
+  const requestedPage = Number(params.page);
+  const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+
+  const { items, total } = await listPosts({ query, page, pageSize: PAGE_SIZE });
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const pageHref = (p: number) => {
+    const sp = new URLSearchParams();
+    if (query) sp.set("q", query);
+    if (p > 1) sp.set("page", String(p));
+    const qs = sp.toString();
+    return qs ? `/?${qs}` : "/";
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <Card>
+      <CardHeader className="gap-4 sm:flex sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <CardTitle className="text-xl">자유게시판</CardTitle>
+          <CardDescription>
+            {query ? `"${query}" 검색 결과 ${total}건` : `전체 ${total}개의 글`}
+          </CardDescription>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <form action="/" className="flex w-full gap-2 sm:w-72">
+          <Input name="q" defaultValue={query} placeholder="제목, 내용, 작성자 검색" aria-label="검색어" />
+          <Button type="submit" variant="outline" size="icon" aria-label="검색">
+            <SearchIcon />
+          </Button>
+        </form>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-6">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="hidden w-16 text-center sm:table-cell">번호</TableHead>
+              <TableHead>제목</TableHead>
+              <TableHead className="w-28 text-center">작성자</TableHead>
+              <TableHead className="hidden w-28 text-center sm:table-cell">작성일</TableHead>
+              <TableHead className="hidden w-16 text-center sm:table-cell">조회</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                  {query ? "검색 결과가 없습니다." : "아직 작성된 글이 없습니다."}
+                </TableCell>
+              </TableRow>
+            ) : (
+              items.map((post) => (
+                <TableRow key={post.id}>
+                  <TableCell className="hidden text-center text-muted-foreground sm:table-cell">{post.id}</TableCell>
+                  <TableCell className="max-w-0">
+                    <Link href={`/posts/${post.id}`} className="flex items-center gap-2 hover:underline">
+                      <span className="truncate">{post.title}</span>
+                      {post.commentCount > 0 && (
+                        <Badge variant="secondary" className="shrink-0">
+                          {post.commentCount}
+                        </Badge>
+                      )}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="truncate text-center">{post.author}</TableCell>
+                  <TableCell className="hidden text-center text-muted-foreground sm:table-cell">
+                    {formatListDate(post.createdAt)}
+                  </TableCell>
+                  <TableCell className="hidden text-center text-muted-foreground sm:table-cell">{post.views}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+
+        <div className="flex flex-col-reverse items-center gap-4 sm:flex-row sm:justify-between">
+          <Pagination className="sm:mx-0 sm:w-auto">
+            <PaginationContent>
+              {page > 1 && (
+                <PaginationItem>
+                  <PaginationPrevious href={pageHref(page - 1)} text="이전" />
+                </PaginationItem>
+              )}
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => Math.abs(p - page) <= 2 || p === 1 || p === totalPages)
+                .map((p) => (
+                  <PaginationItem key={p}>
+                    <PaginationLink href={pageHref(p)} isActive={p === page}>
+                      {p}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+              {page < totalPages && (
+                <PaginationItem>
+                  <PaginationNext href={pageHref(page + 1)} text="다음" />
+                </PaginationItem>
+              )}
+            </PaginationContent>
+          </Pagination>
+          <Link href="/posts/new" className={buttonVariants()}>
+            글쓰기
+          </Link>
         </div>
-      </main>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
